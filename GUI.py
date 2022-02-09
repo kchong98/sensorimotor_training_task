@@ -55,13 +55,19 @@ class gui:
         sys.exit()              # stop script
 
     def acquireData(self, com = 'COM5', baud = 9600):
+        ser = serial.Serial(com, baudrate = baud)
+
         while(1):
             if (self.stop_data.is_set() == False):
-                ser = serial.Serial(com, baudrate = baud)
-                data = serial.readline()
-                ser.close()
+                reading = ser.readline().decode('utf-8').replace('\n', '').replace('\r', '').split(',')
+                if '\r' not in reading and '' not in reading:
+                    self.data = np.array(list(map(np.float32, reading)))/1024*5
+                    self.plot()                
+                    self.canvas.draw()
             else:
                 break
+        ser.close()
+
 
     def generateData(self):
         while(1):
@@ -79,6 +85,4 @@ class gui:
         self.ax.set_ylim([0,5])
         self.ax.axhline(0.5, color = 'r', linestyle = '-') 
         self.ax.get_yaxis().set_visible(False)
-        plt.tight_layout()
-
 
