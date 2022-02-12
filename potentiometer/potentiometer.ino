@@ -2,6 +2,8 @@
 
 */
 
+unsigned long myTime;
+
 void setup() {
   pinMode(A0,INPUT);
   pinMode(A1,INPUT);
@@ -15,6 +17,7 @@ void loop() {
   float p2 = analogRead(A1);
   float p3 = analogRead(A2);
   float p4 = analogRead(A3);
-  Serial.println(String(p1) + ',' + String(p2) + ',' + String(p3)  + ',' + String(p4));
+  myTime = millis();
+  Serial.println(String(myTime) + ',' + String(p1) + ',' + String(p2) + ',' + String(p3)  + ',' + String(p4));
   delay(100);
 }

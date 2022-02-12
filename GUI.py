@@ -6,6 +6,7 @@ from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
 from threading import Thread, Event
 import serial
+from serial.tools import list_ports
 import numpy as np
 from time import sleep
 import sys
@@ -16,13 +17,18 @@ class gui:
         super().__init__()
         self.root = root
         self.data = np.array([0,0,0,0])
-        self.saved_data = np.empty(shape = (4))
+        self.saved_data = np.empty(shape = (5))
+        self.ports = list(list_ports.comports())
+        self.chosen_port = tk.StringVar()
+        self.chosen_port.set(self.ports[0])
         self.stop_data = Event()
         self.var1 = tk.IntVar()
         self.slide_val = tk.DoubleVar()
         self.slide_val.set(1.5)
         c1 = tk.Checkbutton(self.root, text='Generate Data', variable=self.var1, onvalue=1, offvalue=0)
-        c1.grid(row = 1, column=1, columnspan=3)
+        c1.grid(row = 1, column=1, columnspan=1)
+        option_menu = tk.OptionMenu(self.root, self.chosen_port, *self.ports)
+        option_menu.grid(row = 1, column = 2, columnspan=2)
 
         self.fig = plt.figure(figsize = (8,8))
         self.ax = self.fig.add_axes([0,0.05,1,0.95])
@@ -31,8 +37,8 @@ class gui:
         self.canvas.get_tk_widget().grid(row = 2, column=1, columnspan = 3)
         self.canvas.draw()
 
-        slider = tk.Scale(self.root, from_=5.0, to=0.0, variable = self.slide_val, length = 750, digits = 3, resolution = 0.01, command = self.slider_change, showvalue=False)
-        slider.grid(row = 1, column = 4, rowspan = 2)
+        self.slider = tk.Scale(self.root, from_=5.0, to=0.0, variable = self.slide_val, length = 750, digits = 3, resolution = 0.01, command = self.slider_change, showvalue=False)
+        self.slider.grid(row = 1, column = 4, rowspan = 2)
 
         startButton = tk.Button(self.root, text = 'Start', command = self.collect, height = 5, width = 15)
         startButton.grid(row = 3, column = 1, pady=10)
@@ -44,16 +50,19 @@ class gui:
         exitButton.grid(row = 3, column = 3, pady=10)
     
     def collect(self):
+        self.slider['state'] = 'disabled'
         self.stop_data.clear()
         if self.var1.get() == 1:
             self.thread = Thread(target = self.generateData)
             self.thread.start()
         else:
-            self.thread = Thread(target = self.acquireData)
+            self.thread = Thread(target = self.acquireData, args=(self.chosen_port.get()[0:self.chosen_port.get().index(' ')],))
             self.thread.start()
 
     def stop(self):
-        np.savetxt("data.csv", self.saved_data, delimiter=",")
+        self.slider['state'] = 'normal'
+        if self.var1.get() == 0:
+            np.savetxt("data.csv", self.saved_data, delimiter=",")
         self.stop_data.set()
         pass
 
@@ -69,8 +78,11 @@ class gui:
             if (self.stop_data.is_set() == False):
                 reading = ser.readline().decode('utf-8').replace('\n', '').replace('\r', '').split(',')
                 if '\r' not in reading and '' not in reading:
-                    self.data = np.array(list(map(np.float32, reading)))/1024*5
-                    self.saved_data = np.vstack((self.saved_data, self.data))
+                    reading = np.array(list(map(np.float32, reading)))
+                    print(f'Reading: {reading}')
+                    self.data = reading[1:5]/1024*5
+                    print(f'Data: {self.data}')
+                    self.saved_data = np.vstack((self.saved_data, reading))
                     self.plot()                
                     self.canvas.draw()
             else:
