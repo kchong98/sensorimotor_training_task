@@ -9,6 +9,7 @@ import serial
 from serial.tools import list_ports
 import numpy as np
 from time import sleep
+import time
 import sys
 
 
@@ -19,35 +20,43 @@ class gui:
         self.data = np.array([0,0,0,0])
         self.saved_data = np.empty(shape = (5))
         self.ports = list(list_ports.comports())
+        self.hold_clear = [False, False, False, False]
+        self.release = [False, False, False, False]
         self.chosen_port = tk.StringVar()
         self.chosen_port.set(self.ports[0])
         self.stop_data = Event()
         self.var1 = tk.IntVar()
         self.slide_val = tk.DoubleVar()
         self.slide_val.set(1.5)
+        self.hold_time = tk.StringVar(value = '3')
+        holdLabel = tk.Label(self.root, text = 'Hold Time (s):')
+        holdLabel.grid(row = 1, column  = 1)
+        self.holdInput = tk.Entry(self.root, textvariable= self.hold_time)
+        # self.holdInput.insert('3')
+        self.holdInput.grid(row = 1, column = 2)
         c1 = tk.Checkbutton(self.root, text='Generate Data', variable=self.var1, onvalue=1, offvalue=0)
-        c1.grid(row = 1, column=1, columnspan=1)
+        c1.grid(row = 2, column=1, columnspan=1)
         option_menu = tk.OptionMenu(self.root, self.chosen_port, *self.ports)
-        option_menu.grid(row = 1, column = 2, columnspan=2)
+        option_menu.grid(row = 2, column = 2, columnspan=2)
 
         self.fig = plt.figure(figsize = (8,8))
         self.ax = self.fig.add_axes([0,0.05,1,0.95])
         self.plot()
         self.canvas = FigureCanvasTkAgg(self.fig, master = self.root)
-        self.canvas.get_tk_widget().grid(row = 2, column=1, columnspan = 3)
+        self.canvas.get_tk_widget().grid(row = 3, column=1, columnspan = 3)
         self.canvas.draw()
 
         self.slider = tk.Scale(self.root, from_=5.0, to=0.0, variable = self.slide_val, length = 750, digits = 3, resolution = 0.01, command = self.slider_change, showvalue=False)
-        self.slider.grid(row = 1, column = 4, rowspan = 2)
+        self.slider.grid(row = 2, column = 4, rowspan = 2)
 
         startButton = tk.Button(self.root, text = 'Start', command = self.collect, height = 5, width = 15)
-        startButton.grid(row = 3, column = 1, pady=10)
+        startButton.grid(row = 4, column = 1, pady=10)
 
         stopButton = tk.Button(self.root, text = 'Stop', command = self.stop, height = 5, width = 15)
-        stopButton.grid(row = 3, column = 2, pady=10)
+        stopButton.grid(row = 4, column = 2, pady=10)
 
         exitButton = tk.Button(self.root, text = 'Exit', command = self.exit, height = 5, width = 15)
-        exitButton.grid(row = 3, column = 3, pady=10)
+        exitButton.grid(row = 4, column = 3, pady=10)
     
     def collect(self):
         self.slider['state'] = 'disabled'
@@ -79,9 +88,10 @@ class gui:
                 reading = ser.readline().decode('utf-8').replace('\n', '').replace('\r', '').split(',')
                 if '\r' not in reading and '' not in reading:
                     reading = np.array(list(map(np.float32, reading)))
-                    print(f'Reading: {reading}')
+                    # print(f'Reading: {reading}')
                     self.data = reading[1:5]/1024*5
-                    print(f'Data: {self.data}')
+                    # print(f'Data: {self.data}')
+                    self.timer_threads()
                     self.saved_data = np.vstack((self.saved_data, reading))
                     self.plot()                
                     self.canvas.draw()
@@ -102,13 +112,56 @@ class gui:
 
     def plot(self):
         self.ax.clear()
-        color_map = ['y' if (a >= self.slide_val.get()*0.95 and a <= self.slide_val.get()*1.05) else 'g' for a in self.data ]
+        # color_map = ['g' if (a >= self.slide_val.get()*0.95 and a <= self.slide_val.get()*1.05) else 'y' for a in self.data]
+        color_map = list(map(self.colormap, self.hold_clear, self.release))
         self.ax.bar([1,2,3,4], self.data, tick_label = ['1','2','3','4'], width = 0.9, edgecolor = color_map, linewidth = 8, color = 'white')
         self.ax.set_ylim([0,5])
         self.ax.axhline(self.slide_val.get(), color = 'r', linestyle = '-', linewidth = 8) 
         self.ax.get_yaxis().set_visible(False)
 
+    def timer_threads(self):
+        threads = [
+            Thread(target = self.hold_timer, args = [0]),
+            Thread(target = self.hold_timer, args = [1]),
+            Thread(target = self.hold_timer, args = [2]),
+            Thread(target = self.hold_timer, args = [3])
+        ]
+        # print('CHOOSE THREAD')
+        for thread in np.where((self.data >= self.slide_val.get()*0.95) & (self.data <= self.slide_val.get()*1.05))[0]:
+            if self.hold_clear[thread] == False and self.release[thread] == False:
+                # print(f'THREAD {thread}: START')
+                self.hold_clear[thread] = True
+                if not threads[thread].is_alive():
+                    threads[thread].start()
+
+
+    def hold_timer(self, index):
+        # print(f'THREAD {index}: HOLD')
+        start = time.time()
+        end = time.time()
+        while((end-start) <= int(self.hold_time.get())):
+            if (self.data[index] <= self.slide_val.get()*0.95) or (self.data[index] >= self.slide_val.get()*1.05):
+                # print('MOVED!')
+                start = time.time()
+            end = time.time()
+        self.hold_clear[index] = False
+        self.release[index] = True
+        # print('GOOD!')
+        start = time.time()
+        end = time.time()
+        while((end-start) <= 3):
+            end = time.time()
+        # print(f'THREAD {index}: RELEASE')
+        self.release[index] = False            
+
+    def colormap(self, hold, release):
+        if hold == False and release == False:
+            return 'y'
+        elif hold == False and release == True:
+            return 'g'
+        else:
+            return 'orange'
+
     def slider_change(self, event):
         self.plot()
         self.canvas.draw()
-
