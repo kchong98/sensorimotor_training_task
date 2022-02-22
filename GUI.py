@@ -113,10 +113,10 @@ class gui:
     def plot(self):
         self.ax.clear()
         # color_map = ['g' if (a >= self.slide_val.get()*0.95 and a <= self.slide_val.get()*1.05) else 'y' for a in self.data]
-        color_map = list(map(self.colormap, self.hold_clear, self.release))
+        color_map = list(map(self.colormap, self.hold_clear, self.release, self.data))
         self.ax.bar([1,2,3,4], self.data, tick_label = ['1','2','3','4'], width = 0.9, edgecolor = color_map, linewidth = 8, color = 'white')
         self.ax.set_ylim([0,5])
-        self.ax.axhline(self.slide_val.get(), color = 'r', linestyle = '-', linewidth = 8) 
+        self.ax.axhline(self.slide_val.get(), color = 'r', linestyle = '-', linewidth = 16)
         self.ax.get_yaxis().set_visible(False)
 
     def timer_threads(self):
@@ -127,7 +127,7 @@ class gui:
             Thread(target = self.hold_timer, args = [3])
         ]
         # print('CHOOSE THREAD')
-        for thread in np.where((self.data >= self.slide_val.get()*0.95) & (self.data <= self.slide_val.get()*1.05))[0]:
+        for thread in np.where((self.data >= self.slide_val.get()*0.9) & (self.data <= self.slide_val.get()*1.1))[0]:
             if self.hold_clear[thread] == False and self.release[thread] == False:
                 # print(f'THREAD {thread}: START')
                 self.hold_clear[thread] = True
@@ -140,27 +140,31 @@ class gui:
         start = time.time()
         end = time.time()
         while((end-start) <= int(self.hold_time.get())):
-            if (self.data[index] <= self.slide_val.get()*0.95) or (self.data[index] >= self.slide_val.get()*1.05):
+            if (self.data[index] <= self.slide_val.get()*0.9) or (self.data[index] >= self.slide_val.get()*1.1):
                 # print('MOVED!')
                 start = time.time()
             end = time.time()
         self.hold_clear[index] = False
         self.release[index] = True
         # print('GOOD!')
-        start = time.time()
-        end = time.time()
-        while((end-start) <= 3):
-            end = time.time()
-        # print(f'THREAD {index}: RELEASE')
-        self.release[index] = False            
+        # start = time.time()
+        # end = time.time()
+        while(self.data[index] >= self.slide_val.get() * 0.9 and self.data[index] <= self.slide_val.get() * 1.1): #((end-start) <= 3) and
+            continue
+        print(f'THREAD {index}: RELEASE')
+        self.release[index] = False
+        # time.sleep(1)
 
-    def colormap(self, hold, release):
+    def colormap(self, hold, release, data):
         if hold == False and release == False:
             return 'y'
-        elif hold == False and release == True:
+        elif hold == False and release == True and data <= self.slide_val.get() * 1.1 and data >= self.slide_val.get() * 0.9:
             return 'g'
         else:
-            return 'orange'
+            if data <= self.slide_val.get()*1.1 and data >= self.slide_val.get()*0.9:
+                return 'orange'
+            else:
+                return 'y'
 
     def slider_change(self, event):
         self.plot()

@@ -18,6 +18,6 @@ void loop() {
   float p3 = analogRead(A2);
   float p4 = analogRead(A3);
   myTime = millis();
-  Serial.println(String(myTime) + ',' + String(p1) + ',' + String(p2) + ',' + String(p3)  + ',' + String(p4));
+  Serial.println(String(myTime) + ',' + String(p4) + ',' + String(p3) + ',' + String(p2)  + ',' + String(p1));
   delay(100);
 }
