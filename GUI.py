@@ -18,6 +18,7 @@ class gui:
         super().__init__()
         self.root = root
         self.data = np.array([0,0,0,0])
+        self.trial_labels = np.zeros((4,))
         self.saved_data = np.empty(shape = (5))
         self.ports = list(list_ports.comports())
         self.hold_clear = [False, False, False, False]
@@ -72,6 +73,7 @@ class gui:
         self.slider['state'] = 'normal'
         if self.var1.get() == 0:
             np.savetxt("data.csv", self.saved_data, delimiter=",")
+            np.savetxt('trials.csv', self.trial_labels, delimiter=',')
         self.stop_data.set()
         pass
 
@@ -153,6 +155,9 @@ class gui:
             continue
         print(f'THREAD {index}: RELEASE')
         self.release[index] = False
+        temp = np.zeros((4,))
+        temp[index] = 1
+        self.trial_labels = np.vstack((self.trial_labels, temp))
         # time.sleep(1)
 
     def colormap(self, hold, release, data):
