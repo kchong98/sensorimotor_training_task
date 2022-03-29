@@ -18,7 +18,7 @@ class gui:
         super().__init__()
         self.root = root
         self.data = np.array([0,0,0,0])
-        self.trial_labels = np.zeros((4,))
+        self.trial_labels = []
         self.saved_data = np.empty(shape = (5))
         self.ports = list(list_ports.comports())
         self.hold_clear = [False, False, False, False]
@@ -73,7 +73,9 @@ class gui:
         self.slider['state'] = 'normal'
         if self.var1.get() == 0:
             np.savetxt("data.csv", self.saved_data, delimiter=",")
-            np.savetxt('trials.csv', self.trial_labels, delimiter=',')
+            trial_labels = np.array(self.trial_labels)
+            trial_labels = np.unique(trial_labels, axis = 0)
+            np.savetxt('trials.csv', trial_labels, delimiter=',', header = 'string', fmt = '%s')
         self.stop_data.set()
         pass
 
@@ -87,9 +89,9 @@ class gui:
 
         while(1):
             if (self.stop_data.is_set() == False):
-                reading = ser.readline().decode('utf-8').replace('\n', '').replace('\r', '').split(',')
-                if '\r' not in reading and '' not in reading:
-                    reading = np.array(list(map(np.float32, reading)))
+                self.reading = ser.readline().decode('utf-8').replace('\n', '').replace('\r', '').split(',')
+                if '\r' not in self.reading and '' not in self.reading:
+                    reading = np.array(list(map(np.float32, self.reading)))
                     # print(f'Reading: {reading}')
                     self.data = reading[1:5]/1024*5
                     # print(f'Data: {self.data}')
@@ -142,6 +144,13 @@ class gui:
         start = time.time()
         end = time.time()
         while((end-start) <= int(self.hold_time.get())):
+            if (self.data[index] >= self.slide_val.get()*0.9) and (self.data[index] <= self.slide_val.get()*1.1):
+                temp = np.zeros((4,))
+                temp[index] = 1
+                temp = temp.tolist()
+                temp.insert(0, self.reading[0])
+                temp.append('A')
+                self.trial_labels.append(temp)
             if (self.data[index] <= self.slide_val.get()*0.9) or (self.data[index] >= self.slide_val.get()*1.1):
                 # print('MOVED!')
                 start = time.time()
@@ -152,12 +161,16 @@ class gui:
         # start = time.time()
         # end = time.time()
         while(self.data[index] >= self.slide_val.get() * 0.9 and self.data[index] <= self.slide_val.get() * 1.1): #((end-start) <= 3) and
-            continue
+            # continue
+            temp = np.zeros((4,))
+            temp[index] = 1
+            temp = temp.tolist()
+            temp.insert(0, self.reading[0])
+            temp.append('C')
+            self.trial_labels.append(temp)
+            # self.trial_labels = np.vstack((self.trial_labels, temp))
         print(f'THREAD {index}: RELEASE')
         self.release[index] = False
-        temp = np.zeros((4,))
-        temp[index] = 1
-        self.trial_labels = np.vstack((self.trial_labels, temp))
         # time.sleep(1)
 
     def colormap(self, hold, release, data):
